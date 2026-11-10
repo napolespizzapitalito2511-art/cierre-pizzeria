@@ -198,7 +198,7 @@ const canDelMov=m=>["administrador","gerente","dueno"].includes(rol)||(m.uid&&au
 async function loadMovs(){try{const q=await db.collection("movimientos").where("sede","==",SEDE).where("fecha","==",F).get();setMov(q.docs.map(d=>({id:d.id,...d.data()})),F,F,SEDE)}catch(e){}}
 /* ---------- cálculos ---------- */
 function cons(k){const p=prev.inv?.[k]?.quedan,q=iv(k,"quedan");if(p===undefined||p===""||q==="")return "–";return num(p)+EN(k)-SA(k)-num(iv(k,"bajas"))-num(q)}
-const espTot=c=>Object.values(c?.esp||{}).reduce((a,x)=>a+num(x.c)*num(x.d),0),espCnt=c=>Object.values(c?.esp||{}).reduce((a,x)=>a+num(x.c),0);
+const sgn=v=>(v<0?"−":"+")+cop(Math.abs(v)),espTot=c=>Object.values(c?.esp||{}).reduce((a,x)=>a+num(x.c)*num(x.d),0),espCnt=c=>Object.values(c?.esp||{}).reduce((a,x)=>a+num(x.c),0);
 function calc(Cd,Ad,PAd){let b=0,any=false;const r={},cs=(f,k)=>(Cd.cuts||[]).filter(c=>c[f]===k).reduce((a,c)=>a+num(c.cant),0),sm=l=>(Cd[l]||[]).reduce((a,x)=>a+num(x.valor),0);
  ALL.forEach(x=>{const k=x.k,a=Ad.inv?.[k]||{},p=PAd.inv?.[k]?.quedan;let u=null;
   if(p!==undefined&&a.quedan!==undefined&&a.quedan!==""){const m=mv(Cd.sede||SEDE,Cd.fecha||F,k),base=num(p)+num(a.entradas)+m.e-num(a.salidas)-m.s-num(a.bajas)-num(a.quedan);u=MASAS.includes(x)?base+cs("a",k)-cs("de",k):base;any=true}
@@ -230,15 +230,15 @@ function listHtml(l,s){const f=LISTS[l],d=!ed(s);
 /* ---------- precios especiales ---------- */
 function espUnits(k){const v=cons(k);return v==="–"?null:v}
 function espCard(dis){if(!ESPC.length)return"";
- const rows=ESPC.map(x=>{const c=C.esp?.[x.k]?.c??"";return`<div class="it"><div class="g"><label class="f"><small>${esc(x.n)} · +${cop(x.dif)} c/u</small><input inputmode="numeric" data-esp="${esc(x.k)}" value="${esc(c)}" ${dis?"disabled":""} placeholder="0"></label></div></div>`}).join("");
+ const rows=ESPC.map(x=>{const c=C.esp?.[x.k]?.c??"";return`<div class="it"><div class="g"><label class="f"><small>${esc(x.n)} · ${sgn(x.dif)} c/u</small><input inputmode="numeric" data-esp="${esc(x.k)}" value="${esc(c)}" ${dis?"disabled":""} placeholder="0"></label></div></div>`}).join("");
  return sec("esp","5. Precios especiales (según la Z)",`<p class="sub" style="margin:0 0 10px">Escriba cuántos de estos productos vendió <b>en su versión especial</b>. Si no vendió ninguno, déjelo en 0 o vacío.</p>${rows}<p class="sub" id="espw" style="margin:8px 0 0"></p>`,false)}
 function espCheck(){const w=$("espw");if(!w)return;let m=[];ESPC.forEach(x=>{const c=num(C.esp?.[x.k]?.c);if(c>0){const u=espUnits(x.base);if(u!==null&&c>u)m.push(`${x.n}: marcó ${c} pero de «${nameOf(x.base)}» solo se vendieron ${u}.`)}});w.textContent=m.join(" ");w.className="sub"+(m.length?" w":"")}
 function espBad(){for(const x of ESPC){const c=num(C.esp?.[x.k]?.c);if(c>0){const u=espUnits(x.base);if(u!==null&&c>u)return x}}return null}
 function espSet(k,v){const x=ESPC.find(z=>z.k===k);if(!x)return;const c=Math.max(0,Math.floor(num(v)));C.esp??={};if(c>0)C.esp[k]={c,d:num(x.dif),n:x.n,b:x.base};else delete C.esp[k]}
 function espCfg(){if(!["gerente","dueno"].includes(rol))return"";
- return sec("espc","Productos con precio especial",`<p class="sub" style="margin:0 0 10px">Cada producto especial se cobra a otro precio (la diferencia sobre el producto base). La cajera solo anota cuántos vendió; el sistema suma el recargo al dinero que debe haber.</p>
- <div class="sc"><table><tr><th>Nombre</th><th>Producto base</th><th>Recargo</th><th></th></tr>${ESPC.map((x,i)=>`<tr><td>${esc(x.n)}</td><td>${esc(nameOf(x.base))}</td><td class="n">${cop(x.dif)}</td><td><button class="s sm" data-a="espdel" data-i="${i}">Quitar</button></td></tr>`).join("")||`<tr><td colspan="4" class="sub">Aún no hay productos especiales.</td></tr>`}</table></div>
- <div class="g" style="margin-top:10px"><label class="f"><small>Producto base</small><select id="espb">${ALL.map(x=>`<option value="${x.k}">${esc(x.n)}</option>`).join("")}</select></label><label class="f"><small>Nombre (ej. Hamburguesa especial)</small><input id="espn" type="text"></label><label class="f"><small>Recargo ($ de más)</small><input id="espd" inputmode="numeric"></label></div><p><button data-a="espadd">Agregar producto especial</button></p>`,false)}
+ return sec("espc","Productos con precio especial",`<p class="sub" style="margin:0 0 10px">Cada producto especial se cobra a otro precio: la diferencia sobre el producto base puede ser de más (+) o de menos (−). La cajera solo anota cuántos vendió; el sistema suma o resta el ajuste al dinero que debe haber.</p>
+ <div class="sc"><table><tr><th>Nombre</th><th>Producto base</th><th>Ajuste</th><th></th></tr>${ESPC.map((x,i)=>`<tr><td>${esc(x.n)}</td><td>${esc(nameOf(x.base))}</td><td class="n">${sgn(x.dif)}</td><td><button class="s sm" data-a="espdel" data-i="${i}">Quitar</button></td></tr>`).join("")||`<tr><td colspan="4" class="sub">Aún no hay productos especiales.</td></tr>`}</table></div>
+ <div class="g" style="margin-top:10px"><label class="f"><small>Producto base</small><select id="espb">${ALL.map(x=>`<option value="${x.k}">${esc(x.n)}</option>`).join("")}</select></label><label class="f"><small>Nombre (ej. Hamburguesa especial)</small><input id="espn" type="text"></label><label class="f"><small>Ajuste de precio ($): + si cobra de más, − si cobra de menos (ej. -18000)</small><input id="espd" inputmode="numeric"></label></div><p><button data-a="espadd">Agregar producto especial</button></p>`,false)}
 async function espSave(){await db.doc("config/especiales").set({l:ESPC,por:who(),t:Date.now()})}
 function priceCard(){const dir=["gerente","dueno"].includes(rol),req=["auxiliar","administrador"].includes(rol);
  const rows=REQ.map(r=>`<tr><td>${esc(nameOf(r.k))}</td><td class="n">${cop(r.actual)}</td><td class="n">${cop(r.nuevo)}</td><td>${esc(r.por)}</td><td><span class="pill ${r.estado==="pendiente"?"pe":r.estado==="aprobada"?"ok":""}">${r.estado}</span></td><td>${dir&&r.estado==="pendiente"?`<button class="s sm" data-a="ok" data-id="${r.id}">Aprobar</button> <button class="s sm" data-a="no" data-id="${r.id}">Rechazar</button>`:""}</td></tr>`).join("");
@@ -250,7 +250,7 @@ function derived(){
  let h=`<span><small>Venta del día (efectivo + datáfono + transferencias + facturas)</small>${cop(t)}</span><span><small>Descuentos + consumos + cortesías</small>${cop(o3)}</span><span class="${zd!==null&&Math.round(zd)!==0?"w":""}"><small>Cuadre con la Z (venta + descuentos + consumos + cortesías)</small>${zd===null?"Escriba la Z":zTxt(zd)}</span>`;
  if(seeA()){const fc=FDAY.filter(x=>x.conCaja).reduce((a,x)=>a+num(x.valor),0),fd=num(C.fa)-fc;h+=`<span class="${C.fa!==""&&Math.round(fd)!==0?"w":""}"><small>Facturas: cajera ${cop(num(C.fa))} · contable ${cop(fc)}</small>${C.fa===""&&!fc?"–":Math.round(fd)===0?"✅ Cuadran":"⚠️ Diferencia "+cop(fd)}</span>`}
  if(M)h+=`<span><small>Dinero que debe haber</small>${M.any?cop(M.n):"–"}</span><span><small>Diferencia vs. auxiliar</small>${M.any?cop(t-M.n):"–"}</span>`;
- if(espCnt(C))h+=`<span><small>Productos especiales (${espCnt(C)}) · recargos</small>${cop(espTot(C))}</span>`;
+ if(espCnt(C))h+=`<span><small>Productos especiales (${espCnt(C)}) · ajuste de precio</small>${cop(espTot(C))}</span>`;
  h+=`<span><small>Descuentos · consumos · cortesías</small>${cop(sum("desc"))} · ${cop(sum("cons"))} · ${cop(sum("cort"))}</span>`;
  const nt=document.querySelector('[data-p="C.notas"]');if(nt)nt.placeholder=zd!==null&&Math.round(zd)!==0?"La Z no cuadra: explique aquí la diferencia (obligatorio)":"Ej.: faltó cambio, se dañó el datáfono, evento especial…";
  if($("tot"))$("tot").innerHTML=h;
@@ -309,7 +309,7 @@ function cuaHtml(){const sedes=sedesP(),multi=sedes.length>1,D=CUA.D,aux=rol==="
  const row=(l,a,b,o={})=>`<tr class="${o.t?"rt":""}"><td>${l}</td>${C2(cop(a),cop(b))}<td class="n">${o.nd?"":dif(a,b)}</td></tr>`;
  const tbl=`<div class="card"><div class="sc"><table class="cut"><tr><th></th><th>Según caja</th><th>Según contable</th><th>Diferencia</th></tr>
   ${row("Valor de lo vendido (inventario × precio)",K.b,X?X.b:0)}
-  ${ex?row(aux?"Ajustes de precio de caja":"+ Recargos de productos especiales",ex,X?X.e:0,{nd:true}):""}
+  ${ex?row(aux?"Ajustes de precio de caja":"± Ajustes de productos especiales",ex,X?X.e:0,{nd:true}):""}
   ${row("− Descuentos, consumos y cortesías",K.d,X?X.d:0,{nd:true})}
   ${row("= Dinero que debe haber",K.n,X?X.n:0,{t:true})}
   <tr><td>Dinero que entró (efectivo + datáfono + transf. + facturas)</td><td class="n">${cop(t)}</td><td class="n">${X?.any?cop(t):"–"}</td><td class="n"></td></tr>
@@ -1059,7 +1059,7 @@ document.addEventListener("click",async e=>{
  if(d.a==="ia"){IAQ=$("iaq").value.trim();if(!IAQ)return;IAB=true;IAR="";renderPanel();
   try{IAR=await askAI(IAQ)}catch(x){IAR="No se pudo consultar: "+(x?.message||x?.code||x)}IAB=false;renderPanel()}
  if(d.a==="preq"){const k=$("pk").value,n=num($("pn").value);if($("pn").value.trim()===""||n<0)return toast("Escriba el precio (puede ser 0).");await db.collection("solicitudes").add({k,nuevo:n,actual:P(k),por:who(),rol,estado:"pendiente",t:Date.now()});await logH("precio_solicitud",`Solicitó cambiar el precio de ${nameOf(k)} a ${cop(n)}`,[{l:nameOf(k),a:cop(P(k)),d:cop(n)}]);await loadReq();render()}
- if(d.a==="espadd"){const b=$("espb").value,n=($("espn").value||"").trim(),df=num($("espd").value);if(!n||!df)return toast("Escriba el nombre y el recargo.");ESPC=[...ESPC,{k:"e"+Date.now().toString(36),n,base:b,dif:df}];await espSave();await logH("precio_cambio","Agregó producto especial "+n+" (+"+cop(df)+" sobre "+nameOf(b)+")",[]);render();return}
+ if(d.a==="espadd"){const b=$("espb").value,n=($("espn").value||"").trim(),df=num($("espd").value);if(!n||!df)return toast("Escriba el nombre y el ajuste (distinto de 0).");ESPC=[...ESPC,{k:"e"+Date.now().toString(36),n,base:b,dif:df}];await espSave();await logH("precio_cambio","Agregó producto especial "+n+" ("+sgn(df)+" sobre "+nameOf(b)+")",[]);render();return}
  if(d.a==="espdel"){const x=ESPC[+d.i];if(!x)return;ESPC=ESPC.filter((_,i)=>i!==+d.i);await espSave();await logH("precio_cambio","Quitó producto especial "+x.n,[]);render();return}
  if(d.a==="pset"){const k=$("pk").value,n=num($("pn").value);if($("pn").value.trim()===""||n<0)return toast("Escriba el precio (puede ser 0).");const o=P(k);PR[k]=n;await db.doc("precios/lista").set({p:PR});await logH("precio_cambio",`Cambió el precio de ${nameOf(k)} a ${cop(n)}`,[{l:nameOf(k),a:cop(o),d:cop(n)}]);render()}
  if(d.a==="ok"||d.a==="no"){const r=REQ.find(x=>x.id===d.id);if(!r)return;if(d.a==="ok"){PR[r.k]=r.nuevo;await db.doc("precios/lista").set({p:PR})}
