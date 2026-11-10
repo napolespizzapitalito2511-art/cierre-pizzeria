@@ -199,10 +199,10 @@ async function loadMovs(){try{const q=await db.collection("movimientos").where("
 /* ---------- cálculos ---------- */
 function cons(k){const p=prev.inv?.[k]?.quedan,q=iv(k,"quedan");if(p===undefined||p===""||q==="")return "–";return num(p)+EN(k)-SA(k)-num(iv(k,"bajas"))-num(q)}
 const sgn=v=>(v<0?"−":"+")+cop(Math.abs(v)),espTot=c=>Object.values(c?.esp||{}).reduce((a,x)=>a+num(x.c)*num(x.d),0),espCnt=c=>Object.values(c?.esp||{}).reduce((a,x)=>a+num(x.c),0);
-function calc(Cd,Ad,PAd){let b=0,any=false;const r={},cs=(f,k)=>(Cd.cuts||[]).filter(c=>c[f]===k).reduce((a,c)=>a+num(c.cant),0),sm=l=>(Cd[l]||[]).reduce((a,x)=>a+num(x.valor),0);
+function calc(Cd,Ad,PAd){let b=0,any=false,pv=0;const r={},cs=(f,k)=>(Cd.cuts||[]).filter(c=>c[f]===k).reduce((a,c)=>a+num(c.cant),0),sm=l=>(Cd[l]||[]).reduce((a,x)=>a+num(x.valor),0);
  ALL.forEach(x=>{const k=x.k,a=Ad.inv?.[k]||{},p=PAd.inv?.[k]?.quedan;let u=null;
-  if(p!==undefined&&a.quedan!==undefined&&a.quedan!==""){const m=mv(Cd.sede||SEDE,Cd.fecha||F,k),base=num(p)+num(a.entradas)+m.e-num(a.salidas)-m.s-num(a.bajas)-num(a.quedan);u=MASAS.includes(x)?base+cs("a",k)-cs("de",k):base;any=true}
-  r[k]=u;if(u!==null)b+=u*P(k)});const d=sm("desc")+sm("cons")+sm("cort"),e=espTot(Cd);return{r,b,d,e,n:b+e-d,any}}
+  if(p!==undefined&&a.quedan!==undefined&&a.quedan!==""){const m=mv(Cd.sede||SEDE,Cd.fecha||F,k),base=num(p)+num(a.entradas)+m.e-num(a.salidas)-m.s-num(a.bajas)-num(a.quedan);u=MASAS.includes(x)?base+cs("a",k)-cs("de",k):base;if(k==="familiar"){const pu=(num(PAd.inv?.[k]?.porciones)-num(a.porciones)-num(a.bajasp))/8;u+=pu;pv+=pu*P(k)}any=true}
+  r[k]=u;if(u!==null)b+=u*P(k)});const d=sm("desc")+sm("cons")+sm("cort"),e=espTot(Cd);return{r,b,d,e,pv,n:b+e-d,any}}
 const auxMoney=()=>calc(C,A,PA);
 /* ---------- piezas de interfaz ---------- */
 const fld=(p,l,v,dis,x)=>`<label class="f"><small>${l}</small><input data-p="${p}" value="${esc(v)}" ${dis?"disabled":""} ${x===undefined?'inputmode="decimal"':x}></label>`;
@@ -211,7 +211,7 @@ const ro=(id,l)=>`<div class="f"><small>${l}</small><b id="${id}">–</b></div>`
 function bajaF(sc,k,d,dis){const o=d||{};if(!hasBaja(k))return"";
  return fld(`${sc}.inv.${k}.bajas`,"Bajas",o.bajas,dis)+(k==="familiar"?fld(`${sc}.inv.${k}.bajasp`,"Porciones de baja",o.bajasp,dis):"")
  +`<label class="f full" id="rz${sc}-${k}" ${num(o.bajas)>0||num(o.bajasp)>0?"":"hidden"}><small>Razón de la baja (obligatoria)</small><input data-p="${sc}.inv.${k}.razon" value="${esc(o.razon||"")}" type="text" placeholder="Ej.: se cayó, vencido, mal estado…" ${dis?"disabled":""}></label>`}
-const porF=(sc,k,d,dis)=>k==="familiar"?fld(`${sc}.inv.${k}.porciones`,"Porciones que quedan",(d||{}).porciones,dis):"";
+const porF=(sc,k,d,dis)=>k==="familiar"?fld(`${sc}.inv.${k}.porciones`,"Porciones sueltas que quedan (cada una = precio ÷ 8)",(d||{}).porciones,dis):"";
 function movHtml(){const can=canMov(),L=dayMovs(),dest=SEDES.filter(s=>s!==SEDE);
  const form=can?`<div class="it"><div class="g"><label class="f"><small>Producto</small><select id="mvk">${ALL.map(x=>`<option value="${x.k}">${esc(x.n)}</option>`).join("")}</select></label><label class="f"><small>Tipo</small><select id="mvt"><option value="entrada">Entrada</option><option value="salida">Salida</option></select></label><label class="f"><small>Cantidad</small><input id="mvc" inputmode="decimal"></label><label class="f" id="mvhw" hidden><small>Salida hacia</small><select id="mvh"><option value="">Elegir</option>${dest.map(x=>`<option>${x}</option>`).join("")}</select></label><label class="f full"><small>Nota (opcional)</small><input id="mvn" type="text" placeholder="Ej.: llegó pedido del proveedor"></label></div><button style="margin-top:8px" data-a="mvadd">Registrar movimiento</button></div>`:`<p class="sub">Solo lectura.</p>`;
  const rows=L.map(m=>`<tr><td>${esc(m.hora||"")}</td><td>${esc(nameOf(m.k))}</td><td><span class="pill ${m.tipo==="entrada"?"ok":"pe"}">${m.tipo==="entrada"?"Entrada":"Salida"}</span></td><td class="n">${esc(m.cant)}</td><td>${esc(m.hacia||m.desde||"")}${m.tipo==="salida"&&m.hacia?(m.pend?` <span class="pill pe">Sin confirmar</span>`:m.confirmado?` <span class="pill ok">Recibido${num(m.confirmado.cant)!==num(m.cant)?": "+esc(m.confirmado.cant):""}</span>`:""):m.desde?` <span class="pill">Traslado</span>`:""}</td><td>${esc(m.por||"")}${m.nota?` · ${esc(m.nota)}`:""}</td><td>${canDelMov(m)?`<button class="s sm" data-a="mvdel" data-id="${esc(m.id)}">Quitar</button>`:""}</td></tr>`).join("");
@@ -229,9 +229,8 @@ function listHtml(l,s){const f=LISTS[l],d=!ed(s);
 
 /* ---------- precios especiales ---------- */
 function espUnits(k){const v=cons(k);return v==="–"?null:v}
-function espCard(dis){if(!ESPC.length)return"";
- const rows=ESPC.map(x=>{const c=C.esp?.[x.k]?.c??"";return`<div class="it"><div class="g"><label class="f"><small>${esc(x.n)} · ${sgn(x.dif)} c/u</small><input inputmode="numeric" data-esp="${esc(x.k)}" value="${esc(c)}" ${dis?"disabled":""} placeholder="0"></label></div></div>`}).join("");
- return sec("esp","5. Precios especiales (según la Z)",`<p class="sub" style="margin:0 0 10px">Escriba cuántos de estos productos vendió <b>en su versión especial</b>. Si no vendió ninguno, déjelo en 0 o vacío.</p>${rows}<p class="sub" id="espw" style="margin:8px 0 0"></p>`,false)}
+function espInline(dis){if(!ESPC.length)return"";
+ return`<h3 style="margin:14px 0 4px">Precios especiales vendidos</h3><p class="sub" style="margin:0 0 8px">Según la Z: escriba cuántos vendió de cada uno. Si no vendió ninguno, déjelo vacío.</p><div class="g">${ESPC.map(x=>`<label class="f"><small>${esc(x.n)} · ${sgn(x.dif)} c/u</small><input inputmode="numeric" data-esp="${esc(x.k)}" value="${esc(C.esp?.[x.k]?.c??"")}" ${dis?"disabled":""} placeholder="0"></label>`).join("")}</div><p class="sub" id="espw" style="margin:8px 0 0"></p>`}
 function espCheck(){const w=$("espw");if(!w)return;let m=[];ESPC.forEach(x=>{const c=num(C.esp?.[x.k]?.c);if(c>0){const u=espUnits(x.base);if(u!==null&&c>u)m.push(`${x.n}: marcó ${c} pero de «${nameOf(x.base)}» solo se vendieron ${u}.`)}});w.textContent=m.join(" ");w.className="sub"+(m.length?" w":"")}
 function espBad(){for(const x of ESPC){const c=num(C.esp?.[x.k]?.c);if(c>0){const u=espUnits(x.base);if(u!==null&&c>u)return x}}return null}
 function espSet(k,v){const x=ESPC.find(z=>z.k===k);if(!x)return;const c=Math.max(0,Math.floor(num(v)));C.esp??={};if(c>0)C.esp[k]={c,d:num(x.dif),n:x.n,b:x.base};else delete C.esp[k]}
@@ -263,7 +262,7 @@ function derived(){
   [["C",C],["A",A]].forEach(([sc,o])=>{const e=$("rz"+sc+"-"+k);if(e){const d=o.inv?.[k]||{};e.hidden=!(num(d.bajas)>0||num(d.bajasp)>0)}})});
  if(M){ALL.forEach(x=>{const k=x.k,q=iv(k,"quedan"),a=A.inv[k]?.quedan??"",u=M.r[k];
   set("fx-"+k,a===""||q===""?"–":num(a)-num(q),a!==""&&q!==""&&num(a)!==num(q));
-  set("ac-"+k,u===null?"–":u);set("av-"+k,u===null?"–":cop(u*P(k)))});
+  set("ac-"+k,u===null?"–":rd(u));set("av-"+k,u===null?"–":cop(u*P(k)))});
   set("am",M.any?`${cop(M.b)} − ${cop(M.d)} = ${cop(M.n)}`:"–")}
 }
 
@@ -289,6 +288,7 @@ async function cuaLoad(){CUA.s??=me.sede==="Todas"?(SEDE||SEDES[0]):me.sede;CUA.
  let K=null,X=null;
  if(Cd){K=calc(Cd,{inv:Cd.inv||{}},{inv:pc?.inv||{}});if(a)X=calc(Cd,a,pa||{inv:{}})}
  CUA.D={Cd,K,X,hasA:!!a,esp:es?.l||[]};CUA.L=false}
+const rd=v=>Math.round(v*100)/100;
 function cuaHtml(){const sedes=sedesP(),multi=sedes.length>1,D=CUA.D,aux=rol==="auxiliar";
  const ctl=`<div class="card"><div class="g">${multi?`<label class="f"><small>Sede</small><select id="cua_s">${sedes.map(x=>`<option ${x===CUA.s?"selected":""}>${x}</option>`).join("")}</select></label>`:`<label class="f"><small>Sede</small><input value="${esc(CUA.s||me.sede)}" disabled></label>`}<label class="f"><small>Fecha</small><input type="date" id="cua_f" value="${CUA.f||""}" max="${today()}"></label></div><p style="margin:10px 0 0;display:flex;gap:8px;flex-wrap:wrap"><button class="s sm" data-a="cuad" data-w="-1">← Día anterior</button><button class="s sm" data-a="cuad" data-w="1">Día siguiente →</button><button class="s sm" data-a="cuad" data-w="0">Hoy</button></p></div>`;
  const head=`<div class="card"><h2>⚖️ Cuadre del día</h2><p class="sub" style="margin:4px 0 0">${esc(CUA.s||"")} · ${CUA.f?dm(CUA.f):""}. Compara lo que dice el inventario con la plata que realmente entró.</p></div>`;
@@ -308,15 +308,16 @@ function cuaHtml(){const sedes=sedesP(),multi=sedes.length>1,D=CUA.D,aux=rol==="
  const dif=(a,b)=>X?.any?cop(b-a):"–";
  const row=(l,a,b,o={})=>`<tr class="${o.t?"rt":""}"><td>${l}</td>${C2(cop(a),cop(b))}<td class="n">${o.nd?"":dif(a,b)}</td></tr>`;
  const tbl=`<div class="card"><div class="sc"><table class="cut"><tr><th></th><th>Según caja</th><th>Según contable</th><th>Diferencia</th></tr>
-  ${row("Valor de lo vendido (inventario × precio)",K.b,X?X.b:0)}
+  ${row("Valor de lo vendido (inventario × precio)",K.b-K.pv,X?X.b-X.pv:0)}
+  ${K.pv||X?.pv?row("± Porciones sueltas del familiar (ayer − hoy − bajas)",K.pv,X?X.pv:0):""}
   ${ex?row(aux?"Ajustes de precio de caja":"± Ajustes de productos especiales",ex,X?X.e:0,{nd:true}):""}
   ${row("− Descuentos, consumos y cortesías",K.d,X?X.d:0,{nd:true})}
   ${row("= Dinero que debe haber",K.n,X?X.n:0,{t:true})}
   <tr><td>Dinero que entró (efectivo + datáfono + transf. + facturas)</td><td class="n">${cop(t)}</td><td class="n">${X?.any?cop(t):"–"}</td><td class="n"></td></tr>
   <tr class="rt"><td>Sobra / falta</td><td class="n ${K.any&&!R(t-K.n)?"w":""}">${K.any?cop(t-K.n):"–"}</td><td class="n ${X?.any&&!R(t-X.n)?"w":""}">${X?.any?cop(t-X.n):"–"}</td><td class="n"></td></tr></table></div></div>`;
  let mm="";
- if(K.any&&X?.any){const L=ALL.filter(x=>K.r[x.k]!==null&&X.r[x.k]!==null&&Math.round(K.r[x.k]-X.r[x.k])!==0);
-  mm=`<div class="card"><h3 style="margin:0 0 8px">Productos donde no coinciden los conteos</h3>${L.length?`<div class="sc"><table><tr><th>Producto</th><th>Caja</th><th>Contable</th><th>Dif. unid.</th><th>Valor</th></tr>${L.map(x=>{const d=X.r[x.k]-K.r[x.k];return`<tr><td>${esc(x.n)}</td><td class="n">${K.r[x.k]}</td><td class="n">${X.r[x.k]}</td><td class="n">${d>0?"+":""}${d}</td><td class="n">${cop(d*P(x.k))}</td></tr>`}).join("")}</table></div>`:`<p class="sub">Ningún producto difiere. ✅</p>`}</div>`}
+ if(K.any&&X?.any){const L=ALL.filter(x=>K.r[x.k]!==null&&X.r[x.k]!==null&&Math.abs(K.r[x.k]-X.r[x.k])>0.01);
+  mm=`<div class="card"><h3 style="margin:0 0 8px">Productos donde no coinciden los conteos</h3>${L.length?`<div class="sc"><table><tr><th>Producto</th><th>Caja</th><th>Contable</th><th>Dif. unid.</th><th>Valor</th></tr>${L.map(x=>{const d=X.r[x.k]-K.r[x.k];return`<tr><td>${esc(x.n)}</td><td class="n">${rd(K.r[x.k])}</td><td class="n">${rd(X.r[x.k])}</td><td class="n">${d>0?"+":""}${rd(d)}</td><td class="n">${cop(d*P(x.k))}</td></tr>`}).join("")}</table></div>`:`<p class="sub">Ningún producto difiere. ✅</p>`}</div>`}
  const vb=`<div class="vd ${vd[0]}"><b>${vd[1]}</b><span>${vd[2]}</span></div>`;
  return head+ctl+vb+checks+tbl+mm}
 /* ---------- registro ---------- */
@@ -339,10 +340,10 @@ function render(){
  const sedeF=me.sede==="Todas"?`<label class="f"><small>Sede</small><select id="sede">${SEDES.map(s=>`<option ${s===SEDE?"selected":""}>${s}</option>`).join("")}</select></label>`:`<label class="f"><small>Sede</small><input value="${esc(SEDE)}" disabled></label>`;
  let h=topHtml()+(RB?banner():"")+`<div class="card"><div class="g">${sedeF}<label class="f"><small>Fecha</small>${canDate()?`<input type="date" id="fecha" value="${F}">`:`<input value="${F}" disabled>`}</label></div>${cj?`<p style="margin:10px 0 0"><button class="s sm" data-mode="x">← Cambiar tarea</button></p>`:""}</div>`+(MC?`<div class="lock cm"><span>🔒 <b>El mes de ${mesN(ym(F))} está cerrado</b> para ${esc(SEDE)}. No se puede registrar ni modificar nada de este mes.</span></div>`:"")+`<datalist id="dlper">${(SOC[SEDE]||[]).map(x=>`<option value="${esc(x.n)}">Socio</option>`).join("")}</datalist>`;
  if(showCaja){h+=lockBar("caja");
-  h+=sec("ventas","1. Ventas del día",`<div class="g">${fld("C.ef","Efectivo en caja",C.ef,dC)}${fld("C.dat","Datáfono",C.dat,dC)}${fld("C.tr","Transferencias",C.tr,dC)}${fld("C.fa","Facturas pagadas con la caja",C.fa,dC)}${fld("C.caja","Z de caja registradora",C.caja,dC)}</div><div class="tot" id="tot"></div>
+  h+=sec("ventas","1. Ventas del día",`<div class="g">${fld("C.ef","Efectivo en caja",C.ef,dC)}${fld("C.dat","Datáfono",C.dat,dC)}${fld("C.tr","Transferencias",C.tr,dC)}${fld("C.fa","Facturas pagadas con la caja",C.fa,dC)}${fld("C.caja","Z de caja registradora",C.caja,dC)}</div>${espInline(dC)}<div class="tot" id="tot"></div>
    <label class="f" style="margin-top:12px"><small>Notas del cierre (obligatorias si la Z no cuadra)</small><textarea data-p="C.notas" placeholder="Ej.: faltó cambio, se dañó el datáfono, evento especial…" ${dC?"disabled":""}>${esc(C.notas)}</textarea></label>`,true);
-  h+=sec("desc","2. Descuentos a empleados (15%)",listHtml("desc","caja"),false)+sec("cons","3. Consumo de empleados",listHtml("cons","caja"),false)+sec("cort","4. Cortesías",listHtml("cort","caja"),false)+espCard(dC)}
- let nn=cj?0:(ESPC.length?5:4);const N=()=>++nn;
+  h+=sec("desc","2. Descuentos a empleados (15%)",listHtml("desc","caja"),false)+sec("cons","3. Consumo de empleados",listHtml("cons","caja"),false)+sec("cort","4. Cortesías",listHtml("cort","caja"),false)}
+ let nn=cj?0:4;const N=()=>++nn;
  if(showInv){h+=lockBar("inv");
   h+=`<div class="card"><label class="f"><small>Buscar producto</small><input id="q" type="search" placeholder="Escriba para filtrar…" value="${esc(QS)}"></label></div>`;
   h+=sec("movs",N()+". Entradas y salidas del día",movHtml(),true);
@@ -376,7 +377,7 @@ async function save(){
  const b1=sc.includes("inv")?bad(C,"prods"):null,b2=wantA?bad(A,"aux"):null;
  if(b1||b2){CONF=false;render();return toast("Escriba la razón de la baja de "+(b1||b2).n+".")}
  if(MC){render();return toast("El mes está cerrado: no se puede guardar.")}
- if(wantC&&sc.includes("caja")){const eb=espBad();if(eb){OPENS.esp=true;render();return toast("Precios especiales: "+eb.n+" supera lo vendido de "+nameOf(eb.base)+".")}}
+ if(wantC&&sc.includes("caja")){const eb=espBad();if(eb){OPENS.ventas=true;render();return toast("Precios especiales: "+eb.n+" supera lo vendido de "+nameOf(eb.base)+".")}}
  if(wantC&&strict()&&MODE==="caja"){if(C.ef===""&&C.dat===""&&C.fa===""&&C.tr==="")return toast("Ingrese al menos efectivo, datáfono, transferencias o facturas.");
   if(C.caja===""){OPENS.ventas=true;render();return toast("Escriba el valor de la Z de la caja registradora.")}
   const z=zdif(C);if(Math.round(z)!==0&&!String(C.notas||"").trim()){OPENS.ventas=true;render();return toast("La Z no cuadra ("+zTxt(z).replace("⚠️ ","")+"): explique la diferencia en las notas.")}}
